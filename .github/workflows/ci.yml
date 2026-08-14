@@ -21,6 +21,7 @@ jobs:
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 18
+          sudo apt update -y
           sudo apt install -y clang-format-18
       - name: Run format check
         run: bash tools/check_format.sh
@@ -39,11 +40,29 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install build dependencies (Linux)
-        run: sudo apt install ${{ matrix.assembler }}
+        run: sudo apt update -y && sudo apt install ${{ matrix.assembler }}
         if: runner.os == 'Linux'
+      - name: Untap untrusted taps (macOS)
+        run: brew untap aws/tap || true
+        if: runner.os == 'macOS'
       - name: Install build dependencies (Macos)
         run: brew install ${{ matrix.assembler }} automake autoconf coreutils libtool
         if: runner.os == 'macOS'
+      - name: Build
+        run: |
+          ./autogen.sh
+          ./configure --prefix ${HOME}/.local
+          bash -c 'make -j $(nproc)'
+      - name: Run tests
+        run: bash tools/test_checks.sh
+      - name: Run extended tests
+        run: bash tools/test_extended.sh
+
+  run_tests_linux_arm64:
+    needs: check_format
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Build
         run: |
           ./autogen.sh
@@ -60,7 +79,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install build dependencies (Linux)
-        run: sudo apt install nasm mingw-w64
+        run: sudo apt update -y && sudo apt install nasm mingw-w64
       - name: Build
         shell: bash
         run: |
@@ -73,7 +92,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install build dependencies (Linux)
-        run: sudo apt install nasm mingw-w64
+        run: sudo apt update -y && sudo apt install nasm mingw-w64
       - name: Build
         shell: bash
         run: |
@@ -150,11 +169,28 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install build dependencies (Linux)
-        run: sudo apt install nasm zlib1g-dev
+        run: sudo apt update -y && sudo apt install nasm zlib1g-dev
         if: runner.os == 'Linux'
+      - name: Untap untrusted taps (macOS)
+        run: brew untap aws/tap || true
+        if: runner.os == 'macOS'
       - name: Install build dependencies (macOS)
         run: brew install nasm zlib
         if: runner.os == 'macOS'
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
+
+  run_cmake_tests_linux_arm64:
+    needs: check_format
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install build dependencies
+        run: sudo apt update -y && sudo apt install zlib1g-dev
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - name: Build
